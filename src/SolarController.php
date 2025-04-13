@@ -17,12 +17,7 @@ class SolarController
     
     private function processResourceRequest(string $method, string $id): array
     {
-        $solar = $this->gateway->findById($id);
-        
-        if ( ! $solar) {
-            http_response_code(404);
-            return ["message" => "solar not found"];
-        }
+        $solar = $this->findById($id);
         
         switch ($method) {
             case "GET":
@@ -30,20 +25,13 @@ class SolarController
                 
             case "PATCH":
                 $data = (array) json_decode(file_get_contents("php://input"), true);
-                
-                $errors = $this->getValidationErrors($data, false);
-                
-                if ( ! empty($errors)) {
-                    http_response_code(422);
-                    return ["errors" => $errors];
-                }
-                
-                $rows = $this->gateway->update($solar, $data);
-                
+                $data["ID"]=$id;
+                $rows = $this->update($data);
+                $id = $data["ID"];
                 return [
                     "message" => "solar $id updated",
                     "rows" => $rows
-                ];
+                ];              
                 
             case "DELETE":
                 $rows = $this->gateway->delete($id);
@@ -89,23 +77,9 @@ class SolarController
                 
             case "PUT":
                 $data = (array) json_decode(file_get_contents("php://input"), true);
-                $id = $data["id"];
-                $solar = $this->gateway->findById($data["id"]);
-        
-                if ( ! $solar) {
-                    http_response_code(404);
-                    return ["message" => "solar not found"];
-                }
-                
-                $errors = $this->getValidationErrors($data, false);
-                
-                if ( ! empty($errors)) {
-                    http_response_code(422);
-                    return ["errors" => $errors];
-                }
-                
-                $rows = $this->gateway->update($solar, $data);
-                
+                $this->findById($data["ID"]);                
+                $rows = $this->update($data);
+                $id = $data["ID"];
                 return [
                     "message" => "solar $id updated",
                     "rows" => $rows
@@ -120,6 +94,38 @@ class SolarController
                 ];
         }
     }
+
+    private function findById($id)
+    {
+        $solar = $this->gateway->findById($id);
+        
+        if ( ! $solar) {
+            http_response_code(404);
+            echo json_encode(["message" => "solar not found"]);
+            exit;
+        }
+        return $solar;
+    }
+    
+    private function update(array $data)
+    {
+        $errors = $this->getValidationErrors($data, false);
+        
+        if ( ! empty($errors)) {
+            http_response_code(422);
+            echo json_encode(["errors" => $errors]);
+            exit;
+        }
+        
+        return $this->gateway->update($data);
+    }
+    /**
+     * Validate the data for a new or existing solar record.
+     *
+     * @param array $data The data to validate.
+     * @param bool $is_new Whether the record is new or existing.
+     * @return array An array of validation errors, if any.
+     */
     
     private function getValidationErrors(array $data, bool $is_new = true): array
     {
